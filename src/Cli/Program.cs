@@ -1,38 +1,50 @@
-﻿using System;
-using System.Linq;
-using System.Runtime.InteropServices;
+﻿using System.Linq;
 using System.Text.Json;
+using Core;
 
-var sysInfo = new 
-{
-    Student = "Struminskyi Zakharii, FEI-32s",
-    OSDescription = RuntimeInformation.OSDescription,
-    EnvironmentOS = Environment.OSVersion.ToString(),
-    Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
-    DotNetVersion = Environment.Version.ToString(),
-    Runtime = RuntimeInformation.FrameworkDescription,
-    AppDirectory = AppContext.BaseDirectory,
-    CurrentDirectory = Environment.CurrentDirectory,
-    Domain = "Warehouse (goods, batches, balances, transfers)" 
-};
+// Дані, що не стосуються середовища виконання, — це метадані застосунку,
+// а не "інформація про середовище", тому вони лишаються тут, а не в Core.
+const string Student = "Struminskyi Zakharii, FEI-32s";
+const string Domain = "Warehouse (goods, batches, balances, transfers)";
+
+EnvironmentReport report = EnvironmentInfo.Collect();
 
 if (args.Contains("--json"))
 {
-    string jsonString = JsonSerializer.Serialize(sysInfo);
+    var payload = new
+    {
+        Student,
+        Domain,
+        report.OSDescription,
+        report.EnvironmentOS,
+        report.Architecture,
+        report.DotNetVersion,
+        report.Runtime,
+        report.AppDirectory,
+        report.CurrentDirectory,
+        report.DetectedRid,
+        report.ReportedRid,
+        report.BuildNote
+    };
+
+    string jsonString = JsonSerializer.Serialize(payload);
     Console.WriteLine(jsonString);
 }
 else
 {
     Console.WriteLine("CrossApp - Cross-Platform Programming Workshop");
-    Console.WriteLine($"Student: {sysInfo.Student}");
+    Console.WriteLine($"Student: {Student}");
     Console.WriteLine(new string('-', 52));
-    Console.WriteLine($"OS (OSDescription): {sysInfo.OSDescription}");
-    Console.WriteLine($"OS (Environment)  : {sysInfo.EnvironmentOS}");
-    Console.WriteLine($"Process Arch      : {sysInfo.Architecture}");
-    Console.WriteLine($".NET Version (CLR): {sysInfo.DotNetVersion}");
-    Console.WriteLine($"Runtime           : {sysInfo.Runtime}");
-    Console.WriteLine($"App Directory     : {sysInfo.AppDirectory}");
-    Console.WriteLine($"Current Directory : {sysInfo.CurrentDirectory}");
+    Console.WriteLine($"OS (OSDescription) : {report.OSDescription}");
+    Console.WriteLine($"OS (Environment)   : {report.EnvironmentOS}");
+    Console.WriteLine($"Process Arch       : {report.Architecture}");
+    Console.WriteLine($".NET Version (CLR) : {report.DotNetVersion}");
+    Console.WriteLine($"Runtime            : {report.Runtime}");
+    Console.WriteLine($"App Directory      : {report.AppDirectory}");
+    Console.WriteLine($"Current Directory  : {report.CurrentDirectory}");
+    Console.WriteLine($"RID (visznacheno)  : {report.DetectedRid}");
+    Console.WriteLine($"RID (vid .NET)     : {report.ReportedRid}");
+    Console.WriteLine($"Build Note (TFM)   : {report.BuildNote}");
     Console.WriteLine(new string('-', 52));
-    Console.WriteLine($"Domain Area       : {sysInfo.Domain}");
+    Console.WriteLine($"Domain Area        : {Domain}");
 }
