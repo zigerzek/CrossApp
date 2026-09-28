@@ -1,9 +1,38 @@
 ﻿using System.Linq;
 using System.Text.Json;
 using Core;
+using Core.Dto;
+using Core.Import;
 
-// Дані, що не стосуються середовища виконання, — це метадані застосунку,
-// а не "інформація про середовище", тому вони лишаються тут, а не в Core.
+string path = args.Length > 0 && !args[0].StartsWith("--")
+    ? args[0]
+    : Path.Combine("data", "sample.csv");
+
+if (!File.Exists(path))
+{
+    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
+    return 1;
+}
+
+ImportResult<GoodsDto> result = Path.GetExtension(path).ToLowerInvariant() switch
+{
+    ".json" => GoodsJsonImporter.Load(path),
+    ".csv" => GoodsCsvImporter.Load(path),
+    var ext => throw new NotSupportedException($"Розширення '{ext}' не підтримується")
+};
+
+Console.WriteLine($"Завантажено записів: {result.Items.Count}");
+foreach (GoodsDto g in result.Items.Take(5))
+    Console.WriteLine($"  {g.Id,-6} {g.Sku,-10} {g.Name,-26} {g.Quantity,5} {g.Unit}");
+
+if (result.Errors.Count > 0)
+{
+    Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
+    foreach (string e in result.Errors)
+        Console.WriteLine($"  ! {e}");
+}
+
+
 const string Student = "Struminskyi Zakharii, FEI-32s";
 const string Domain = "Warehouse (goods, batches, balances, transfers)";
 
@@ -48,3 +77,5 @@ else
     Console.WriteLine(new string('-', 52));
     Console.WriteLine($"Domain Area        : {Domain}");
 }
+
+return 0;
