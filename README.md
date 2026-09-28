@@ -12,24 +12,47 @@ CrossApp/
 ├── CrossApp.slnx
 ├── README.md
 ├── .gitignore
+├── data/
+│   ├── sample.csv           (10+ рядків, 2-3 навмисно пошкоджені)
+│   └── sample.json          (додаткове завдання — JSON-імпорт)
 └── src/
     ├── Core/
     │   ├── Core.csproj          (TargetFrameworks: net8.0;net10.0)
-    │   └── EnvironmentInfo.cs   (record EnvironmentReport + клас EnvironmentInfo)
+    │   ├── EnvironmentInfo.cs   (record EnvironmentReport + клас EnvironmentInfo)
+    │   ├── Dto/
+    │   │   ├── GoodsDto.cs      (record — товар)
+    │   │   ├── BatchDto.cs      (record — партія товару)
+    │   │   └── ImportResult.cs  (record ImportResult<T>)
+    │   └── Import/
+    │       ├── GoodsCsvImporter.cs   (Load + ParseLine, pattern matching)
+    │       └── GoodsJsonImporter.cs  (додаткове завдання)
     └── Cli/
         ├── Cli.csproj           (TargetFramework: net10.0; ProjectReference на Core)
         └── Program.cs
 ```
 
-Проєкт **Core** — бібліотека класів (class library) без точки входу. Наразі містить
-допоміжний код для отримання інформації про середовище виконання: `EnvironmentReport`
-(record — незмінний набір даних) та `EnvironmentInfo` (static class з методом `Collect()`,
-який ці дані збирає, але нічого не друкує). Починаючи з наступних лабораторних робіт сюди
-додаватимуться доменна модель (`Core/Dto`, `Core/Domain`), сервіси та сховища (`Core/Storage`).
+Проєкт **Core** — бібліотека класів (class library) без точки входу. Містить:
+- допоміжний код для отримання інформації про середовище виконання: `EnvironmentReport`
+  (record) та `EnvironmentInfo` (static class з методом `Collect()`);
+- доменні DTO (`Core/Dto`) — `GoodsDto`, `BatchDto`, `ImportResult<T>`;
+- імпортери (`Core/Import`) — `GoodsCsvImporter` і `GoodsJsonImporter`, які розбирають
+  вхідний файл і повертають `ImportResult<GoodsDto>` (успішні записи разом з переліком
+  помилок, а не виняток на першому пошкодженому рядку).
 
-Проєкт **Cli** — консольна точка входу. `Program.cs` лише викликає `EnvironmentInfo.Collect()`
-і форматує вивід (текстом або JSON за прапорцем `--json`); жодної логіки визначення
-середовища в ньому немає. Залежність односторонняя: `Cli → Core`.
+Наступними лабораторними сюди додадуться сутності з поведінкою (`Core/Domain`) та
+сховища (`Core/Storage`).
+
+Проєкт **Cli** — консольна точка входу. `Program.cs`:
+1. визначає шлях до файлу (`args[0]` або `data/sample.csv` за замовчуванням) і перевіряє
+   його існування;
+2. обирає імпортер за розширенням файлу (`.csv` → `GoodsCsvImporter`, `.json` →
+   `GoodsJsonImporter`) і виводить кількість завантажених записів, перші 5 з них та
+   перелік помилок з номерами рядків;
+3. виводить інформацію про середовище виконання (`EnvironmentInfo.Collect()`) текстом
+   або JSON за прапорцем `--json`.
+
+Жодної логіки розбору файлів чи визначення середовища в `Program.cs` немає — вся вона
+в `Core`. Залежність односторонняя: `Cli → Core`.
 
 ## Середовище розробки
 
@@ -42,7 +65,37 @@ dotnet build
 dotnet run --project src/Cli
 ```
 
-Вивід результату у форматі JSON (додаткове завдання):
+## Формат вхідних даних
+
+**CSV** (`data/sample.csv`) — роздільник `;`, перший рядок — заголовок
+(`id;sku;name;unit;quantity`), кодування UTF-8. Розбір рядка — через `switch expression`
+з патернами: перевірка кількості колонок, порожніх значень, коректності числа (`TryParse`
++ `when`). Пошкоджені рядки не перериває імпорт — потрапляють у список помилок з номером
+рядка.
+
+**JSON** (`data/sample.json`, додаткове завдання) — масив об'єктів з тими самими полями,
+що й `GoodsDto` (`PropertyNameCaseInsensitive = true`). На відміну від CSV-імпортера,
+пошкоджений JSON не парситься частково — помилка (якщо файл невалідний) зупиняє весь
+імпорт, а не окремий рядок.
+
+## Запуск імпорту
+
+```bash
+# CSV за замовчуванням (data/sample.csv)
+dotnet run --project src/Cli
+
+# CSV, явний шлях
+dotnet run --project src/Cli -- data/sample.csv
+
+# JSON (додаткове завдання) — обирається автоматично за розширенням
+dotnet run --project src/Cli -- data/sample.json
+
+# Неіснуючий файл — коректне повідомлення, без винятку
+dotnet run --project src/Cli -- no-such-file.csv
+```
+
+Вивід результату у форматі JSON для звіту про середовище виконання (не плутати з
+JSON-імпортом даних):
 
 ```bash
 dotnet run --project src/Cli -- --json
