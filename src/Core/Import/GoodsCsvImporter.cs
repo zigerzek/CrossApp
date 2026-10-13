@@ -11,6 +11,7 @@ public static class GoodsCsvImporter
     {
         var items = new List<GoodsDto>();
         var errors = new List<string>();
+        var sourceLineNumbers = new List<int>();
         string[] lines = File.ReadAllLines(path, Encoding.UTF8);
 
         for (int i = 0; i < lines.Length; i++)
@@ -27,6 +28,7 @@ public static class GoodsCsvImporter
             {
                 case ParseOk ok:
                     items.Add(ok.Value);
+                    sourceLineNumbers.Add(number);
                     break;
                 case ParseFailed failed:
                     errors.Add($"рядок {number}: {failed.Reason}");
@@ -34,7 +36,8 @@ public static class GoodsCsvImporter
             }
         }
 
-        return new ImportResult<GoodsDto>(items, errors);
+        return new ImportResult<GoodsDto>(items.AsReadOnly(), errors.AsReadOnly(),
+            sourceLineNumbers.AsReadOnly());
     }
 
     private static ParseOutcome ParseLine(string line)

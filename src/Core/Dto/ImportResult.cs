@@ -2,4 +2,5 @@ namespace Core.Dto;
 
 public sealed record ImportResult<T>(
     IReadOnlyList<T> Items,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<int>? SourceLineNumbers = null);

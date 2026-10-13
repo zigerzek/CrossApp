@@ -4,4 +4,5 @@ public sealed record BatchDto(
     string Id,
     string GoodsId,
     int Quantity,
-    DateOnly ReceivedDate);
+    DateOnly ReceivedDate,
+    string Status = "Draft");
