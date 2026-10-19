@@ -1,100 +1,109 @@
+using Cli.Composition;
+using Core;
+using Core.Abstractions;
 using Core.Domain;
-using Core.Dto;
-using Core.Import;
+using Core.Services;
+using Core.Storage;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
-Console.WriteLine("Лабораторна робота 4 — доменна модель Warehouse");
+if (args is ["--help"])
+{
+    Console.WriteLine("Лабораторна 5: [--file] [--path <файл.json>] [--cache] [--factory] [--list-only]");
+    Console.WriteLine("Без --file: 18 початкових товарів у пам'яті. --file: постійне JSON-сховище.");
+    Console.WriteLine("--cache: декоратор; --factory: фабрика; --list-only: читання без змін.");
+    return 0;
+}
 
-Console.WriteLine("\n=== Сценарій 1: успішні операції ===");
-Goods goods = Goods.Create("G-001", "sku-001", "Цемент М400 25кг", "шт", 100,
-    "Зберігати в сухому місці");
-Console.WriteLine($"Створено: {goods}");
-goods.RegisterArrival(50);
-Console.WriteLine($"Прихід 50: {goods}");
-goods.Issue(30);
-Console.WriteLine($"Видача 30: {goods}");
-
-GoodsDto before = goods.ToDto();
-bool passed = true;
-Console.WriteLine("\n=== Сценарій 2: порушення інваріантів ===");
-passed &= ExpectFailure<InvalidOperationException>("Видача понад залишок", () => goods.Issue(1000));
-passed &= ExpectFailure<ArgumentException>("Порожній SKU",
-    () => Goods.Create("G-002", " ", "Пісок", "т", 10));
-passed &= ExpectFailure<ArgumentOutOfRangeException>("Від'ємний залишок",
-    () => Goods.Create("G-003", "SKU-003", "Цегла", "шт", -5));
-passed &= ExpectFailure<ArgumentOutOfRangeException>("Нульовий прихід", () => goods.RegisterArrival(0));
-passed &= ExpectFailure<ArgumentOutOfRangeException>("Від'ємна видача", () => goods.Issue(-1));
-passed &= ExpectFailure<ArgumentException>("Порожня одиниця вимірювання",
-    () => Goods.Create("G-004", "SKU-004", "Фарба", " ", 10));
-passed &= goods.ToDto() == before;
-Console.WriteLine($"Після відмов: {goods}; стан незмінний: {goods.ToDto() == before}");
-
-Console.WriteLine("\n=== Мапінг сутність ↔ DTO ===");
-Goods restored = Goods.FromDto(goods.ToDto());
-Console.WriteLine($"Відновлено: {restored}; усі дані збережено: {restored.ToDto() == goods.ToDto()}");
-passed &= restored.ToDto() == goods.ToDto();
-passed &= ExpectFailure<ArgumentOutOfRangeException>("Некоректний DTO",
-    () => Goods.FromDto(goods.ToDto() with { Quantity = -1 }));
-
-Console.WriteLine("\n=== Додаткове завдання: дві сутності та стани ===");
-Batch batch = Batch.Create("B-001", goods.Id, 20, new DateOnly(2026, 10, 12));
-Console.WriteLine($"До оприбуткування: {batch}; залишок {goods.Quantity}");
-goods.RegisterArrival(batch);
-Console.WriteLine($"Після оприбуткування: {batch}; залишок {goods.Quantity}");
-GoodsDto beforeBatchFailures = goods.ToDto();
-BatchDto receivedSnapshot = batch.ToDto();
-passed &= ExpectFailure<InvalidOperationException>("Повторне оприбуткування",
-    () => goods.RegisterArrival(batch));
-passed &= ExpectFailure<InvalidOperationException>("Скасування отриманої партії", batch.Cancel);
-
-Batch foreign = Batch.Create("B-002", "G-OTHER", 10, new DateOnly(2026, 10, 12));
-passed &= ExpectFailure<InvalidOperationException>("Партія іншого товару",
-    () => goods.RegisterArrival(foreign));
-Batch cancelled = Batch.Create("B-003", goods.Id, 5, new DateOnly(2026, 10, 12));
-cancelled.Cancel();
-Console.WriteLine($"Дозволений перехід Draft → Cancelled: {cancelled.Status}");
-passed &= ExpectFailure<InvalidOperationException>("Оприбуткування скасованої партії",
-    () => goods.RegisterArrival(cancelled));
-passed &= ExpectFailure<InvalidOperationException>("Повторне скасування", cancelled.Cancel);
-bool unchanged = goods.ToDto() == beforeBatchFailures && batch.ToDto() == receivedSnapshot &&
-    foreign.Status == BatchStatus.Draft && cancelled.Status == BatchStatus.Cancelled;
-Console.WriteLine($"Після відмов залишок {goods.Quantity}; стани обох сутностей збережено: {unchanged}");
-passed &= unchanged;
-Batch restoredBatch = Batch.FromDto(batch.ToDto());
-Console.WriteLine($"Відновлення партії з DTO: {restoredBatch}; дані збережено: {restoredBatch.ToDto() == batch.ToDto()}");
-passed &= restoredBatch.ToDto() == batch.ToDto();
-
-Console.WriteLine("\n=== Додаткове завдання: імпорт → доменні сутності ===");
-string path = args.Length > 0 ? args[0] : Path.Combine("data", "lab04.csv");
 try
 {
-    ImportResult<Goods> result = GoodsDomainMapper.Map(GoodsCsvImporter.Load(path));
-    Console.WriteLine($"Доменних сутностей: {result.Items.Count}; помилок: {result.Errors.Count}");
-    foreach (Goods item in result.Items)
-        Console.WriteLine($"  {item}");
-    foreach (string error in result.Errors)
-        Console.WriteLine($"  ! {error}");
+    StoreOptions options = StoreOptions.Parse(args);
+    ICatalogStore store;
+    if (options.UseFactory)
+        store = StoreFactory.Create(args);
+    else
+    {
+        // Основний варіант ручного DI: конкретні залежності створюються тут.
+        store = options.UseFile
+            ? new FileCatalogStore(options.DataPath)
+            : new InMemoryCatalogStore(SampleData.Goods());
+        if (options.UseCache) store = new CachingCatalogStore(store);
+    }
+    var service = new CatalogService(store);
+
+    Console.WriteLine("Лабораторна робота 5 — сервісний шар Warehouse");
+    Console.WriteLine($"Сховище: {store.GetType().Name}");
+    Console.WriteLine($"Створення: {(options.UseFactory ? "StoreFactory.Create(args)" : "Program.cs (ручний DI)")}");
+    if (options.UseFile) Console.WriteLine($"Файл: {options.DataPath}");
+    if (options.UseCache) Console.WriteLine($"Декоратор над: {(options.UseFile ? "файловим сховищем" : "сховищем у пам'яті")}");
+    Console.WriteLine($"На початку: {service.All().Count} товарів");
+
+    if (options.ListOnly)
+    {
+        PrintGoods(service.All());
+        Console.WriteLine("Режим читання: дані не змінено.");
+        return 0;
+    }
+
+    Console.WriteLine("\n=== Add / Receive / Issue / Find ===");
+    Goods created = service.Add("DEMO-005", "Кабель для демонстрації", "м", 50, "Лабораторна 5");
+    Console.WriteLine($"Додано: {created}");
+    service.Receive(created.Id, 25);
+    Console.WriteLine($"Після приходу 25: {service.Find(created.Id)}");
+    service.Issue(created.Id, 10);
+    Console.WriteLine($"Знайдено за id після видачі 10: {service.Find(created.Id)}");
+
+    Console.WriteLine("\n=== Очікувані відмови ===");
+    bool passed = ExpectFailure("Повторний id", () => store.Add(created));
+    passed &= ExpectFailure("Відсутній id", () => service.Receive("__missing_lab05__", 1));
+    passed &= ExpectFailure("Видача понад залишок", () => service.Issue(created.Id, 1000));
+    passed &= service.Find(created.Id)?.Quantity == 65;
+    Console.WriteLine($"Залишок після відмов: {service.Find(created.Id)?.Quantity}");
+
+    Goods temporary = service.Add("TEMP-005", "Тимчасовий товар", "шт", 0);
+    bool removed = service.Remove(temporary.Id);
+    bool removedAgain = service.Remove(temporary.Id);
+    passed &= removed && !removedAgain && service.Find(temporary.Id) is null;
+    Console.WriteLine($"Remove: {removed}; повторне видалення: {removedAgain}");
+
+    Console.WriteLine("\n=== Додаткове завдання: Search(Func<Goods, bool>) ===");
+    IReadOnlyList<Goods> found = service.Search(item => item.Unit == "м" && item.Quantity >= 60);
+    PrintGoods(found);
+    passed &= found.Any(item => item.Id == created.Id);
+
+    Console.WriteLine($"\n=== Повний список: {service.All().Count} товарів ===");
+    PrintGoods(service.All());
+    if (options.UseCache)
+    {
+        // Друге читання та пошук використовують кеш декоратора.
+        passed &= service.All().Any(item => item.Id == created.Id) && service.Find(created.Id)?.Quantity == 65;
+        Console.WriteLine("Декоратор: повторні List/Find виконано; кількість звернень перевіряють ServiceChecks.");
+    }
+
+    Console.WriteLine(passed ? "\nДемонстрацію лабораторної 5 завершено успішно." : "\nПомилка перевірки сценарію.");
+    return passed ? 0 : 1;
 }
-catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
 {
-    Console.WriteLine($"Не вдалося імпортувати '{path}': {ex.Message}");
+    Console.Error.WriteLine($"Помилка: {ex.Message}");
     return 1;
 }
 
-Console.WriteLine(passed ? "\nДемонстрацію лабораторної 4 завершено успішно." : "\nПомилка перевірки інваріантів.");
-return passed ? 0 : 1;
+static void PrintGoods(IReadOnlyList<Goods> items)
+{
+    foreach (Goods item in items) Console.WriteLine($"  {item}");
+}
 
-static bool ExpectFailure<TException>(string title, Action action) where TException : Exception
+static bool ExpectFailure(string title, Action action)
 {
     try
     {
         action();
-        Console.WriteLine($"  ПОМИЛКА: {title} — очікуваний виняток не виник");
+        Console.WriteLine($"ПОМИЛКА: {title} — виняток не виник.");
         return false;
     }
-    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+    catch (InvalidOperationException ex)
     {
-        Console.WriteLine($"  {title}: {ex.GetType().Name} — {ex.Message}");
-        return ex.GetType() == typeof(TException);
+        Console.WriteLine($"{title}: {ex.Message}");
+        return true;
     }
 }
