@@ -27,6 +27,7 @@ Check("Goods normalizes required strings and preserves Note", () =>
     Goods goods = Goods.Create(" G-1 ", " sku-1 ", " Cement ", " kg ", 0, " note ");
     Equal(new GoodsDto("G-1", "SKU-1", "Cement", "kg", 0, " note "), goods.ToDto());
     Equal(goods.ToDto(), Goods.FromDto(goods.ToDto()).ToDto());
+    
 });
 
 foreach (string? value in new string?[] { null, "", "   " })
@@ -57,6 +58,7 @@ Check("Arrival and issue including exact depletion", () =>
     goods.Issue(120);
     Equal(0, goods.Quantity);
 });
+
 
 foreach (int amount in new[] { 0, -1, int.MinValue })
     Check($"Invalid operation amount {amount} leaves state intact", () =>

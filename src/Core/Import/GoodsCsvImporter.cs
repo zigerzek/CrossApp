@@ -7,7 +7,7 @@ public static class GoodsCsvImporter
 {
     private const char Separator = ';';
 
-    public static ImportResult<GoodsDto> Load(string path)
+    public static ImportResult<GoodsDto> Load(string path, Action<string>? onSkipped = null)
     {
         var items = new List<GoodsDto>();
         var errors = new List<string>();
@@ -31,7 +31,9 @@ public static class GoodsCsvImporter
                     sourceLineNumbers.Add(number);
                     break;
                 case ParseFailed failed:
-                    errors.Add($"рядок {number}: {failed.Reason}");
+                    string error = $"рядок {number}: {failed.Reason}";
+                    errors.Add(error);
+                    onSkipped?.Invoke(error);
                     break;
             }
         }
