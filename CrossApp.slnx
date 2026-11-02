@@ -6,6 +6,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/DomainChecks/DomainChecks.csproj" />
     <Project Path="tests/EventChecks/EventChecks.csproj" />
+    <Project Path="tests/ReportChecks/ReportChecks.csproj" />
     <Project Path="tests/ServiceChecks/ServiceChecks.csproj" />
   </Folder>
 </Solution>
