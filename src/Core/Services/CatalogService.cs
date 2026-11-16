@@ -51,6 +51,60 @@ public sealed class CatalogService(ICatalogStore store, INotificationSink? notif
         return _store.List().Where(predicate).ToList().AsReadOnly();
     }
 
+    public Task<int> ImportAsync(
+        ICatalogImporter importer,
+        string path,
+        CancellationToken ct = default) => ImportAsync(importer, path, progress: null, ct);
+
+    public async Task<int> ImportAsync(
+        ICatalogImporter importer,
+        string path,
+        IProgress<int>? progress,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(importer);
+        var items = await importer.LoadAsync(path, ct);
+        var added = 0;
+        for (int i = 0; i < items.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var item = items[i];
+            if (_store.GetById(item.Id) is null) // ідемпотентність імпорту
+            {
+                _store.Add(item);
+                OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+                added++;
+            }
+            if (progress is not null && items.Count > 0)
+            {
+                int percent = (int)((i + 1) * 100.0 / items.Count);
+                progress.Report(percent);
+            }
+        }
+        return added;
+    }
+
+    // Додаткове 1: потоковий імпорт через IAsyncEnumerable
+    public async Task<int> ImportStreamAsync(
+        ICatalogImporter importer,
+        string path,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(importer);
+        var added = 0;
+        await foreach (var item in importer.ReadStreamAsync(path, ct))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_store.GetById(item.Id) is not null) continue;
+            _store.Add(item);
+            OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+            added++;
+            progress?.Report(added);
+        }
+        return added;
+    }
+
     private void OnChanged(Goods item, CatalogChangeKind kind, int delta)
     {
         var change = new CatalogChangedEventArgs(item.Id, kind, delta,

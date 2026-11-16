@@ -13,9 +13,112 @@ if (args is ["--help"])
     return 0;
 }
 
+using var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
+
+bool useStream = false;
+bool immediateCancel = false;
+TimeSpan? timeout = null;
+bool showProgress = false;
+
+var filteredArgs = new List<string>();
+for (int i = 0; i < args.Length; i++)
+{
+    string arg = args[i];
+    if (arg == "--stream")
+    {
+        useStream = true;
+    }
+    else if (arg == "--cancel")
+    {
+        immediateCancel = true;
+    }
+    else if (arg == "--progress")
+    {
+        showProgress = true;
+    }
+    else if (arg == "--timeout" && i + 1 < args.Length)
+    {
+        string tStr = args[++i];
+        if (tStr.EndsWith("ms", StringComparison.OrdinalIgnoreCase) && int.TryParse(tStr[..^2], out int ms))
+            timeout = TimeSpan.FromMilliseconds(ms);
+        else if (tStr.EndsWith("s", StringComparison.OrdinalIgnoreCase) && double.TryParse(tStr[..^1], out double s))
+            timeout = TimeSpan.FromSeconds(s);
+        else if (double.TryParse(tStr, out double num))
+            timeout = TimeSpan.FromSeconds(num);
+    }
+    else
+    {
+        filteredArgs.Add(arg);
+    }
+}
+
+string[] activeArgs = filteredArgs.ToArray();
+bool isFileImport = activeArgs.Contains("--file") || activeArgs.Contains("import");
+
+if (isFileImport)
+{
+    (string _, string[] storeArguments) = SplitArguments(activeArgs);
+    StoreOptions options = StoreOptions.Parse(storeArguments);
+    string dataPath = options.DataPath;
+    bool hasCustomPath = activeArgs.Contains("--path");
+    if (!hasCustomPath && !File.Exists(dataPath) && File.Exists("data/catalog.json"))
+        dataPath = Path.GetFullPath("data/catalog.json");
+
+    if (timeout.HasValue)
+        cts.CancelAfter(timeout.Value);
+    if (immediateCancel)
+        cts.Cancel();
+
+    try
+    {
+        var store = new InMemoryCatalogStore();
+        var service = new CatalogService(store);
+        var importer = new JsonCatalogImporter();
+
+        IProgress<int>? progress = showProgress
+            ? new Progress<int>(percent => Console.Write($"\rПрогрес імпорту: {percent,3}%"))
+            : null;
+
+        int added = useStream
+            ? await service.ImportStreamAsync(importer, dataPath, progress, cts.Token)
+            : await service.ImportAsync(importer, dataPath, progress, cts.Token);
+
+        if (showProgress)
+            Console.WriteLine();
+
+        Console.WriteLine($"Імпортовано записів: {added}");
+        return 0;
+    }
+    catch (OperationCanceledException)
+    {
+        Console.WriteLine("Імпорт скасовано.");
+        return 0;
+    }
+    catch (DomainException ex)
+    {
+        Console.WriteLine($"Дані відхилено: {ex.Message}");
+        return 1;
+    }
+    catch (FileNotFoundException)
+    {
+        Console.WriteLine($"Файл не знайдено: {dataPath}");
+        return 1;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Помилка: {ex.Message}");
+        return 1;
+    }
+}
+
 try
 {
-    (string command, string[] storeArguments) = SplitArguments(args);
+    (string command, string[] storeArguments) = SplitArguments(activeArgs);
     StoreOptions options = StoreOptions.Parse(storeArguments);
     ICatalogStore store = options.UseFactory
         ? StoreFactory.Create(storeArguments)
@@ -23,7 +126,7 @@ try
     var service = new CatalogService(store);
     IReadOnlyList<Goods> items = service.All();
 
-    Console.WriteLine("Лабораторна робота 7 — LINQ to Objects для Warehouse");
+    Console.WriteLine("Лабораторна робота 8 — Async/Await, Cancellation, Unit-тести для Warehouse");
     Console.WriteLine($"Сховище: {store.GetType().Name}; товарів: {items.Count}");
 
     if (options.ListOnly)
@@ -64,7 +167,7 @@ try
             PrintBenchmark(ReportService.BenchmarkTopByQuantity());
             return 0;
         default:
-            Console.Error.WriteLine($"Невідома команда звіту: {command}.");
+            Console.Error.WriteLine($"Невідома команда: {command}.");
             PrintHelp();
             return 1;
     }
@@ -75,6 +178,21 @@ try
     Console.WriteLine($"Після додавання товару: {deferred.AfterChange}");
     Console.WriteLine($"Знімок після очищення джерела: {deferred.SnapshotAfterClear}");
     return 0;
+}
+catch (OperationCanceledException)
+{
+    Console.WriteLine("Операцію скасовано.");
+    return 0;
+}
+catch (DomainException ex)
+{
+    Console.WriteLine($"Дані відхилено: {ex.Message}");
+    return 1;
+}
+catch (FileNotFoundException ex)
+{
+    Console.WriteLine($"Файл не знайдено: {ex.FileName}");
+    return 1;
 }
 catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
 {
@@ -111,7 +229,7 @@ static (string Command, string[] StoreArguments) SplitArguments(string[] args)
         }
 
         if (command is not null)
-            throw new ArgumentException("Укажіть лише одну команду звіту.");
+            throw new ArgumentException("Укажіть лише одну команду.");
         command = argument;
     }
 
@@ -172,10 +290,7 @@ static void PrintGoods(IReadOnlyList<Goods> items)
 
 static void PrintHelp()
 {
-    Console.WriteLine("Лабораторна 7: LINQ to Objects для Warehouse");
-    Console.WriteLine("Обов'язкові: report-top | report-low | report-groups | report-sum");
-    Console.WriteLine("Додаткові: report-batches | report-top-batches | report-benchmark");
-    Console.WriteLine("Без команди запускається report-top.");
-    Console.WriteLine("Опції сховища: --file --path <файл.json> --cache --factory --list-only");
-    Console.WriteLine("Приклад: dotnet run --project src/Cli -f net10.0 -- report-groups");
+    Console.WriteLine("Лабораторна 8: Async/Await, Cancellation, Unit-тести для Warehouse");
+    Console.WriteLine("Асинхронний імпорт: dotnet run --project src/Cli -- --file [--path <файл.json>] [--stream] [--cancel] [--timeout <ms/s>] [--progress]");
+    Console.WriteLine("Звіти (Lab 7): report-top | report-low | report-groups | report-sum | report-batches | report-top-batches | report-benchmark");
 }

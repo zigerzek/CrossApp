@@ -1,8 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Core\Core.csproj" />
     <None Include="../../data/lab06.csv" Link="data/lab06.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../data/catalog.json" Link="data/catalog.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>
