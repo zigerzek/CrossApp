@@ -1,13 +1,11 @@
 using System.Text.Json;
 using Core.Abstractions;
 using Core.Domain;
-using Core.Dto;
 
 namespace Core.Storage;
 
 public sealed class FileCatalogStore : ICatalogStore
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
     private readonly string _path;
     private Dictionary<string, Goods> _cache = CatalogData.Create();
     private bool _loaded;
@@ -17,6 +15,9 @@ public sealed class FileCatalogStore : ICatalogStore
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         _path = Path.GetFullPath(path);
     }
+
+    /// <summary>Повний шлях до JSON-файлу, з яким працює сховище.</summary>
+    public string FilePath => _path;
 
     public IReadOnlyList<Goods> List()
     {
@@ -69,8 +70,7 @@ public sealed class FileCatalogStore : ICatalogStore
 
         try
         {
-            var dtos = JsonSerializer.Deserialize<List<GoodsDto>>(json)
-                ?? throw new JsonException("Очікується JSON-масив товарів, а не null.");
+            var dtos = CatalogJson.Deserialize(json);
             // Публікуємо кеш лише після перевірки всього файлу.
             _cache = CatalogData.Create(dtos.Select(Goods.FromDto));
             _loaded = true;
@@ -83,19 +83,8 @@ public sealed class FileCatalogStore : ICatalogStore
 
     private void Commit(Dictionary<string, Goods> next)
     {
-        string directory = Path.GetDirectoryName(_path)!;
-        Directory.CreateDirectory(directory);
-        string temporary = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            string json = JsonSerializer.Serialize(next.Values.Select(item => item.ToDto()).ToList(), Options);
-            File.WriteAllText(temporary, json);
-            File.Move(temporary, _path, overwrite: true);
-            _cache = next; // Невдалий запис не змінює кеш.
-        }
-        finally
-        {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
+        // Формат і атомарний запис (.tmp + File.Move) — у CatalogJson, спільні з експортом.
+        CatalogJson.WriteAtomic(_path, next.Values);
+        _cache = next; // Невдалий запис не змінює кеш.
     }
 }

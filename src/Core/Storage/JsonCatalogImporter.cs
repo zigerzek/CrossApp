@@ -8,6 +8,15 @@ namespace Core.Storage;
 
 public sealed class JsonCatalogImporter : ICatalogImporter
 {
+    private readonly bool _allowZeroQuantity;
+
+    /// <param name="allowZeroQuantity">
+    /// <c>false</c> (лаб. 8, імпорт постачань): запис із кількістю 0 — порушення бізнес-правила (<see cref="DomainException"/>).
+    /// <c>true</c> (лаб. 9, імпорт усієї колекції): нульовий залишок — допустимий стан складу,
+    /// інакше файл, створений експортом, не можна було б імпортувати назад.
+    /// </param>
+    public JsonCatalogImporter(bool allowZeroQuantity = false) => _allowZeroQuantity = allowZeroQuantity;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -31,7 +40,7 @@ public sealed class JsonCatalogImporter : ICatalogImporter
             ct.ThrowIfCancellationRequested();
             var dto = dtos[i];
 
-            if (dto.Quantity == 0)
+            if (!_allowZeroQuantity && dto.Quantity == 0)
                 throw new DomainException($"Запис {i + 1}: кількість не може бути 0.");
 
             try
@@ -65,7 +74,7 @@ public sealed class JsonCatalogImporter : ICatalogImporter
             if (dto is null) continue;
             index++;
 
-            if (dto.Quantity == 0)
+            if (!_allowZeroQuantity && dto.Quantity == 0)
                 throw new DomainException($"Запис {index}: кількість не може бути 0.");
 
             Goods item;

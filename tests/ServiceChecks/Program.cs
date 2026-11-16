@@ -136,7 +136,7 @@ try
         item.RegisterArrival(5);
         store.Update(item);
         Equal(15, new FileCatalogStore(path).GetById("G-1")!.Quantity);
-        var dtos = JsonSerializer.Deserialize<List<GoodsDto>>(File.ReadAllText(path))!;
+        var dtos = CatalogJson.Deserialize(File.ReadAllText(path)); // формат файлу (camelCase) — лаб. 9
         Equal(item.ToDto(), dtos.Single());
         store.Remove("g-1");
         Equal(0, new FileCatalogStore(path).List().Count);

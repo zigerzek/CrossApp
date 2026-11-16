@@ -1,16 +1,40 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Лише ідентифікатор сховища user-secrets (комітиться). Самі значення лежать поза репозиторієм. -->
+    <UserSecretsId>78e79000-18df-407f-ad51-0c2efa4a8b9d</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- Стек конфігурації живе в Cli (точці входу): Core про JSON-файли й user-secrets знати не повинен. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="10.*" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Core\Core.csproj" />
+  </ItemGroup>
+
+  <!-- Файли конфігурації мають потрапити до bin/ і до publish/, інакше FileNotFoundException. -->
+  <ItemGroup>
+    <None Update="appsettings*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Демонстраційні вхідні дані попередніх лабораторних (data/ у корені репозиторію). -->
+  <ItemGroup>
     <None Include="../../data/lab06.csv" Link="data/lab06.csv" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../data/catalog.json" Link="data/catalog.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
 
 </Project>

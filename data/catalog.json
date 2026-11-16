@@ -1,0 +1,19 @@
+[
+  { "id": "G-001", "sku": "SKU-001", "name": "Цемент М400 25кг", "unit": "шт", "quantity": 100 },
+  { "id": "G-002", "sku": "SKU-002", "name": "Пісок", "unit": "кг", "quantity": 18 },
+  { "id": "G-003", "sku": "SKU-003", "name": "Цегла", "unit": "шт", "quantity": 4200 },
+  { "id": "G-004", "sku": "SKU-004", "name": "Фарба біла", "unit": "л", "quantity": 80 },
+  { "id": "G-005", "sku": "SKU-005", "name": "Шпаклівка", "unit": "кг", "quantity": 250 },
+  { "id": "G-006", "sku": "SKU-006", "name": "Кабель UTP cat6", "unit": "м", "quantity": 350 },
+  { "id": "G-007", "sku": "SKU-007", "name": "Саморізи", "unit": "шт", "quantity": 60 },
+  { "id": "G-008", "sku": "SKU-008", "name": "Гіпсокартон", "unit": "шт", "quantity": 120 },
+  { "id": "G-009", "sku": "SKU-009", "name": "Профіль металевий", "unit": "м", "quantity": 160 },
+  { "id": "G-010", "sku": "SKU-010", "name": "Піна монтажна", "unit": "шт", "quantity": 40 },
+  { "id": "G-011", "sku": "SKU-011", "name": "Ґрунтовка", "unit": "л", "quantity": 75 },
+  { "id": "G-012", "sku": "SKU-012", "name": "Клей для плитки", "unit": "кг", "quantity": 500 },
+  { "id": "G-013", "sku": "SKU-013", "name": "Плитка керамічна", "unit": "шт", "quantity": 90 },
+  { "id": "G-014", "sku": "SKU-014", "name": "Утеплювач", "unit": "шт", "quantity": 200 },
+  { "id": "G-015", "sku": "SKU-015", "name": "Ламінат", "unit": "шт", "quantity": 65 },
+  { "id": "G-016", "sku": "SKU-016", "name": "Плінтус", "unit": "м", "quantity": 180 },
+  { "id": "G-017", "sku": "SKU-017", "name": "Рукавиці", "unit": "шт", "quantity": 30 }
+]
